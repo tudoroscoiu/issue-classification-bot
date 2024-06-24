@@ -18,12 +18,18 @@ The *Issue Classification Bot* is a tool designed to automate the labeling of Gi
 1. Clone the repository to your local machine.
 2. Add the following files to the local `/issue-classification-bot-2/Bot` directory:
   - `bot_key.pem`: containing the private key of the bot's GitHub App (find more information about private keys [here](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/managing-private-keys-for-github-apps))
-  - `bot_email.secret`: containing the email address and the email password used by the bot to send notifications, structured as follows:
+  - `bot_email.secret`: containing the email address and the email password used by the bot to authenticate to the email provider and send notifications, structured as follows:
     * 1st line for the bot email address
     * 2nd line for the bot email password (app password, not the usual email password. For Google Accounts, find more information [here](https://support.google.com/mail/answer/185833?hl=en))
 3. Download the [weight files](https://zenodo.org/records/7821209) required by the bot's ML model and add them to the local<br> `/issue-classification-bot-2/ModelsBackend/plugins/satd/SATD_Detector/data` directory as follows:
     * Rename `fasttext_issue_300.bin` to `embeddings.bin`
     * Rename `satd_detector_for_issues.hdf5` to `weights.hdf5`
+      
+**NOTE❗**<br>
+By default:
++ *the bot processes lingering issues every 1 day from the moment it starts running. To change this, modify the `lingering_check_frequency` value in `/issue-classification-bot-2/Bot/app.py` to the desired frequency (in days) before running the bot in step 5. For example, change `lingering_check_frequency = 1` to your preferred number of days.*
++ *the bot uses Gmail's SMTP server to send emails. To change this, modify the `email_server` and `email_server_port` values in `/issue-classification-bot-2/Bot/emailSender.py` to your desired server and port before running the bot in step 5.*
+
 4. Navigate to the root directory `/issue-classification-bot-2` containing the `docker-compose.yml` file.
 5. Run the bot using the command:
    ```bash
@@ -38,14 +44,11 @@ The *Issue Classification Bot* is a tool designed to automate the labeling of Gi
    smee --url https://smee.io/Wpx6fSOaWjEaOK --path /webhook --port 5001
    ```
 
-## Usage
-Interact with the *Issue Classification Bot* by using the following commands in the comments of a GitHub issue:
-- `/tdbot label`: Automatically labels an issue using the ML model.
-- `/tdbot label <label>`: Manually labels an issue with the specified label.
-- `/tdbot help`: Displays this help message with command details.
-
 ## Configuring the Bot
-Edit the `Bot/config.json` file to configure the bot's behavior:
+1. Install the bot's [GitHub App](https://github.com/apps/issue-classification-bot) on the repositories where you want the bot to operate.
+2. For each repository where you have installed the bot's GitHub App, create a `Bot` folder on the main branch and place a `config.json` file inside this folder. This will allow you to configure the bot's behavior uniquely for each repository. <br>
+**NOTE❗** <br>*If you skip this step, the bot will use the **local** `Bot/config.json` file for any repository that does not have `Bot/config.json` available on the main branch.*
+4. Edit the `Bot/config.json` file to configure the bot's behavior:
 - `payload-type`: Choose between:
   * "title":       to set whether the bot's ML model should generate a label based on the title of the issue
   * "description": to set whether the bot's ML model should generate a label based on the description of the issue
@@ -71,6 +74,7 @@ Edit the `Bot/config.json` file to configure the bot's behavior:
   - `lingering-mode`: if the bot should send email notifications when lingering issues have been identified in the repository (by setting `when-to-send` to "lingering" or "all"), choose between:
     * "creation-date": if the bot should determine whether an issue is lingering or not based on the creation date of the issue
     * "last-modified": if the bot should determine whether an issue is lingering or not based on the last date when the issue has been modified (either by posting a comment, assigning a label, or any other kind of modification)
+  - `feature-under-development`: if the bot should send email notifications when the feature under development has been mentioned in the issue (by setting `when-to-send` to "feature" or "all"), choose the keyword for the feature under development, specified as a *string*. <br> If this keyword is present in the description of the issue, or if a label added to the issue (using `/tdbot label <label>`) matches the feature under development keyword, the bot will send email notifications about its presence in the issue.
   - `recipients`: the list of email addresses of contributors that should receive email notifications, specified as a *list of strings*: \["emailAddress1", "emailAddress2", ...]
   - `email-body-template`: The template strings used for the body of the bot-generated emails
     * `label`: email body template (*string*) for email notifications about labels<br>
@@ -124,9 +128,32 @@ Edit the `Bot/config.json` file to configure the bot's behavior:
         > \- #3: 'Another Test Issue'. The issue has been created on 2024-04-06 21:37:57+00:00, and it has been last modified on 2024-04-07 20:41:36+00:00
         >
         > This is an automated email. Replies to this message will not be read.
+    * `feature`: email body template (*string*) for email notifications about the feature under development<br>
+    **Any string that you use for this email body template can contain any of the following placeholders, which the bot replaces with actual data:**
+      - **/feature**: the feature under development mentioned in the issue
+      - **/issue_number**: the number of the issue where the bot identified the feature under development
+      - **/issue_author**: the author of the issue where the bot identified the feature under development
+      - **/issue_title**: the title of the issue where the bot identified the feature under development
+      - **/issue_description**: the description of the issue where the bot identified the feature under development
+      - **/issue_link**: the hyperlink to the issue where the bot identified the feature under development
+      - **/issue_repository**: the repository of the issue where the bot identified the feature under development
+      - **/issue_updated_at**: the date and time when the issue where the bot identified the feature under development was last updated
+      - **/issue_created_at**: the date and time when the issue where the bot identified the feature under development was created
+      #### Example:
+      ```JSON
+      "feature": "Hi,\n\nThe feature under development: /feature has been mentioned in issue #/issue_number with title: '/issue_title' and description: '/issue_description', created by @/issue_author in the /issue_repository repository.\nLink to the issue: /issue_link\n\nThis is an automated email. Replies to this message will not be read."
+      ```
+      will result in an email body in the following form:
+      > Hi,
+      >
+      > The feature under development: automation has been mentioned in issue #4 with title: 'Test Issue' and description: 'Test Description', created by @user in the test-repo repository. <br>
+      > Link to the issue: https://github.com/owner/test-repo/issues/4
+      >
+      > This is an automated email. Replies to this message will not be read. 
   - `email-subject-template`: the template strings used for the subject of the bot-generated emails
     * `label`:     email subject template (*string*) for email notifications about labels
     * `lingering`: email subject template (*string*) for email notifications about lingering issues
+    * `feature`: email subject template (*string*) for email notifications about the feature under development
    
 ### Example `config.json`:
 ```JSON
@@ -144,6 +171,7 @@ Edit the `Bot/config.json` file to configure the bot's behavior:
     "specific-labels": ["SATD"],
     "lingering-issue-threshold": 30,
     "lingering-mode": "last-modified",
+    "feature-under-development": "automation",
     "recipients" : [
       "contributor1@gmail.com",
       "contributor2@yahoo.com"
@@ -153,15 +181,27 @@ Edit the `Bot/config.json` file to configure the bot's behavior:
       "lingering": [
         "Hi,\n\nThe following lingering issues have been identified:\n{}\nThis is an automated email. Replies to this message will not be read.",
         "- #/issue_number: '/issue_title'. The issue has been created on /issue_created_at, and it has been last modified on /issue_updated_at\n"
-      ]
+      ],
+      "feature": "Hi,\n\nThe feature under development: /feature has been mentioned in issue #/issue_number with title: '/issue_title' and description: '/issue_description', created by @/issue_author in the /issue_repository repository.\nLink to the issue: /issue_link\n\nThis is an automated email. Replies to this message will not be read."
     },
     "email-subject-template": {
       "label": "Technical debt identified",
-      "lingering": "Lingering issues identified"
+      "lingering": "Lingering issues identified",
+      "feature": "Feature under development mentioned"
     }
   }
 }
 ```
+
+## Usage
+Interact with the *Issue Classification Bot* by using the following commands in the comments of a GitHub issue:
+- `/tdbot label`: Automatically labels an issue using the ML model.
+- `/tdbot label <label>`: Manually labels an issue with the specified label.
+- `/tdbot help`: Displays this help message with command details.
+
+**NOTE❗**<br>
+*For any command the bot executes on an issue within a repository, it will fetch the latest `Bot/config.json` file from the repository (if available; otherwise, it retrieves the latest `Bot/config.json` from the local machine). Consequently, the `config.json` can be safely modified while the bot is running, and the bot's behavior will adjust accordingly for the next command it performs.*
+
 ## Troubleshooting
 If you encounter issues with the bot:
 - If labels are not being assigned to issues when a `/tdbot label` comment is posted:
