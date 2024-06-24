@@ -1,0 +1,6 @@
+Here are the commands :robot: **Issue Classification Bot** understands:
+ - \"/tdbot label\" labels an issue using the ML model.
+
+ - \"/tdbot label \<label\>\" labels an issue with the given label.
+ 
+ - \"/tdbot help\" shows this help message.

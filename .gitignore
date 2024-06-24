@@ -1,0 +1,6 @@
+.DS_Store
+embeddings.bin
+weights.hdf5
+bot_key.pem
+bot_email.secret
+__pycache__

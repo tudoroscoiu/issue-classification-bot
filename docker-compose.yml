@@ -1,0 +1,39 @@
+version: '3'
+
+services:
+  app:
+    build: 
+      context: Bot
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - NAME=World
+      - GITHUB_WEBHOOK_SECRET=ea4c0584ecdda56af9ab38921ff2e2831449d5a2c13fbc9e5db79786cee54221
+    develop:
+      watch:
+        - action : rebuild
+          path: ./Bot/app.py
+        - action: rebuild
+          path: ./Bot/emailSender.py
+        - action: rebuild
+          path: ./Bot/lingeringIssuesProcessor.py
+        - action: rebuild
+          path: ./Bot/bot_email.secret
+        - action: rebuild
+          path: ./Bot/bot_key.pem
+        - action: sync
+          path: ./Bot/config.json
+          target: /usr/src/app/config.json
+        - action: sync
+          path: ./Bot/help_message.txt
+          target: /usr/src/app/help_message.txt
+
+  model:
+    build:
+      context: ModelsBackend  # Replace with the actual path to your other service's directory
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - BACKEND_PORT=8000
